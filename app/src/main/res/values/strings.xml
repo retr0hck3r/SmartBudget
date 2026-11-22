@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">SmartBudget</string>
+    <string name="widget_speedometer_label">Дневной лимит и ЗП</string>
+    <string name="widget_envelopes_label">Конверты бюджета</string>
+    <string name="nav_main">Главная</string>
+    <string name="nav_income">Выплата</string>
+    <string name="nav_menu">Меню</string>
+    <string name="nav_preferences">Стоп-лист</string>
+    <string name="nav_history">Учет</string>
+</resources>

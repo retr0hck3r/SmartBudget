@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#131B2E" />
+      <stop offset="100%" stop-color="#07090E" />
+    </radialGradient>
+    <linearGradient id="cyberEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FFAA" />
+      <stop offset="100%" stop-color="#00D287" />
+    </linearGradient>
+    <linearGradient id="cyberCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGlow)" />
+  <rect width="508" height="508" x="2" y="2" rx="108" fill="none" stroke="#1E293B" stroke-width="2" />
+
+  <!-- Outer Cyber Hexagon / Shield -->
+  <polygon points="256,64 420,158 420,354 256,448 92,354 92,158" 
+           fill="#0D121D" stroke="url(#cyberEmerald)" stroke-width="8" stroke-linejoin="round" filter="url(#neonGlow)" />
+
+  <!-- Inner Cyber Tech Circuit Accent -->
+  <polygon points="256,96 390,174 390,338 256,416 122,338 122,174" 
+           fill="none" stroke="url(#cyberCyan)" stroke-width="3" stroke-dasharray="16,8" opacity="0.6" />
+
+  <!-- Ruble Financial Core Symbol -->
+  <!-- Top Loop -->
+  <path d="M208 170 H296 C332 170 354 192 354 220 C354 248 332 270 296 270 H208 Z" 
+        fill="url(#cyberEmerald)" />
+  <path d="M236 198 H292 C312 198 324 208 324 220 C324 232 312 242 292 242 H236 Z" 
+        fill="#0D121D" />
+
+  <!-- Vertical Stem -->
+  <rect x="208" y="170" width="32" height="175" rx="4" fill="url(#cyberEmerald)" />
+
+  <!-- Upper Crossbar -->
+  <rect x="170" y="255" width="140" height="24" rx="6" fill="url(#cyberEmerald)" />
+
+  <!-- Lower Crossbar -->
+  <rect x="170" y="305" width="115" height="24" rx="6" fill="url(#cyberEmerald)" />
+
+  <!-- Tech Dots / Circuit Points -->
+  <circle cx="256" cy="64" r="10" fill="#38BDF8" filter="url(#neonGlow)" />
+  <circle cx="420" cy="158" r="8" fill="#00FFAA" />
+  <circle cx="420" cy="354" r="8" fill="#00FFAA" />
+  <circle cx="256" cy="448" r="10" fill="#38BDF8" filter="url(#neonGlow)" />
+  <circle cx="92" cy="354" r="8" fill="#00FFAA" />
+  <circle cx="92" cy="158" r="8" fill="#00FFAA" />
+</svg>
