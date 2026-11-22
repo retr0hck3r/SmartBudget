@@ -1,7 +1,5 @@
 package com.smartbudget.app.ui.screens.menu
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,28 +7,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.smartbudget.app.data.network.DeliveryStore
 import com.smartbudget.app.data.network.StoreDeliveryManager
 import com.smartbudget.app.data.network.model.CartItemRequest
 import com.smartbudget.app.domain.menu.DailyMealPlan
 import com.smartbudget.app.domain.menu.MenuRecipeEngine
 import com.smartbudget.app.domain.menu.Recipe
+import com.smartbudget.app.domain.menu.ShoppingItem
 import com.smartbudget.app.domain.stoplist.UserFoodPreferences
 import com.smartbudget.app.ui.theme.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +37,6 @@ fun MenuScreen(
     onCreateCartLink: suspend (List<CartItemRequest>) -> Result<String>
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     val mealPlan = remember(userPreferences) {
         MenuRecipeEngine.generatePlan(15, userPreferences)
@@ -54,12 +51,16 @@ fun MenuScreen(
     }
 
     var selectedTab by remember { mutableStateOf(0) } // 0: Меню рецептов, 1: Корзина
-    var isLoadingCart by remember { mutableStateOf(false) }
     var selectedRecipeForDetail by remember { mutableStateOf<Recipe?>(null) }
     var selectedStore by remember { mutableStateOf(DeliveryStore.VKUSVILL) }
-    var showStoreDropdown by remember { mutableStateOf(false) }
 
-    // Диалог с подробным рецептом, шагами приготовления и интерактивным таймером
+    // Состояние собранных пользователем товаров
+    val collectedItems = remember { mutableStateMapOf<String, Boolean>() }
+
+    // Пошаговый ассистент сборщика корзины
+    var isAssistantOpen by remember { mutableStateOf(false) }
+    var assistantIndex by remember { mutableStateOf(0) }
+
     selectedRecipeForDetail?.let { recipe ->
         RecipeDetailDialog(
             recipe = recipe,
@@ -67,10 +68,125 @@ fun MenuScreen(
         )
     }
 
+    // ДИАЛОГ ПОШАГОВОГО АССИСТЕНТА СБОРКИ КОРЗИНЫ
+    if (isAssistantOpen && shoppingList.isNotEmpty()) {
+        val currentItem = shoppingList[assistantIndex.coerceIn(0, shoppingList.size - 1)]
+        AlertDialog(
+            onDismissRequest = { isAssistantOpen = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Сборка в ${selectedStore.title}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = SentinelEmerald)
+                    )
+                    Text(
+                        text = "${assistantIndex + 1} из ${shoppingList.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SentinelCyan
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    LinearProgressIndicator(
+                        progress = { (assistantIndex + 1).toFloat() / shoppingList.size.toFloat() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = SentinelEmerald,
+                        trackColor = SentinelBgSecondary
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SentinelBgSecondary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = currentItem.name,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = SentinelTextPrimary
+                            )
+                            val qty = if (currentItem.totalQuantity % 1.0 == 0.0) currentItem.totalQuantity.toInt().toString() else "%.1f".format(currentItem.totalQuantity)
+                            Text(
+                                text = "Нужное количество: $qty ${currentItem.unit}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SentinelEmerald
+                            )
+                            Text(
+                                text = "Ориентир цены: ~${currentItem.estimatedTotalCost.toInt()} ₽",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SentinelTextSecondary
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            StoreDeliveryManager.openProductSearch(context, selectedStore, currentItem.name)
+                            collectedItems[currentItem.name] = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SentinelEmerald, contentColor = Color(0xFF002817)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Найти и положить в ${selectedStore.title}", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(
+                            onClick = { if (assistantIndex > 0) assistantIndex-- },
+                            enabled = assistantIndex > 0
+                        ) {
+                            Text("← Назад", color = if (assistantIndex > 0) SentinelCyan else SentinelTextSecondary)
+                        }
+
+                        TextButton(
+                            onClick = {
+                                if (assistantIndex < shoppingList.size - 1) {
+                                    assistantIndex++
+                                } else {
+                                    isAssistantOpen = false
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = if (assistantIndex < shoppingList.size - 1) "Следующий →" else "Завершить ✓",
+                                color = SentinelEmerald,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { isAssistantOpen = false }) {
+                    Text("Закрыть", color = SentinelTextSecondary)
+                }
+            },
+            containerColor = SentinelBgCard
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Рацион и доставка", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)) },
+                title = { Text("Рацион и корзина", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = SentinelBgPrimary,
                     titleContentColor = SentinelTextPrimary
@@ -79,101 +195,51 @@ fun MenuScreen(
         },
         containerColor = SentinelBgPrimary,
         bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = SentinelBgCard,
-                tonalElevation = 8.dp,
-                shadowElevation = 12.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            if (selectedTab == 1) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = SentinelBgCard,
+                    tonalElevation = 8.dp,
+                    shadowElevation = 12.dp
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Итого корзина (15 дн.):",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SentinelTextSecondary
-                            )
-                            Text(
-                                text = "${totalEstimatedCost.toInt()} ₽",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = SentinelEmerald
-                            )
-                        }
-
-                        // Выбор магазина
-                        Box {
-                            OutlinedButton(
-                                onClick = { showStoreDropdown = true },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelCyan),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text(selectedStore.title)
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                val checkedCount = collectedItems.count { it.value }
+                                Text(
+                                    text = "Собрано $checkedCount из ${shoppingList.size} товаров:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SentinelTextSecondary
+                                )
+                                Text(
+                                    text = "${totalEstimatedCost.toInt()} ₽",
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = SentinelEmerald
+                                )
                             }
 
-                            DropdownMenu(
-                                expanded = showStoreDropdown,
-                                onDismissRequest = { showStoreDropdown = false }
+                            Button(
+                                onClick = {
+                                    assistantIndex = 0
+                                    isAssistantOpen = true
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SentinelEmerald, contentColor = Color(0xFF002817)),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                DeliveryStore.values().forEach { store ->
-                                    DropdownMenuItem(
-                                        text = { Text(store.title) },
-                                        onClick = {
-                                            selectedStore = store
-                                            showStoreDropdown = false
-                                        }
-                                    )
-                                }
+                                Icon(Icons.Default.Bolt, contentDescription = null)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Пошаговый сборщик", fontWeight = FontWeight.Bold)
                             }
                         }
-                    }
-
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = {
-                            when (selectedStore) {
-                                DeliveryStore.VKUSVILL -> {
-                                    coroutineScope.launch {
-                                        isLoadingCart = true
-                                        val cartItems = shoppingList.map {
-                                            CartItemRequest(it.vkusvillProductId ?: "vv_item", 1)
-                                        }
-                                        val result = onCreateCartLink(cartItems)
-                                        isLoadingCart = false
-                                        result.onSuccess { url ->
-                                            StoreDeliveryManager.openCart(context, DeliveryStore.VKUSVILL, url)
-                                        }.onFailure {
-                                            StoreDeliveryManager.openStore(context, DeliveryStore.VKUSVILL)
-                                        }
-                                    }
-                                }
-                                DeliveryStore.LENTA, DeliveryStore.YANDEX_LAVKA -> {
-                                    StoreDeliveryManager.openStore(context, selectedStore)
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SentinelEmerald,
-                            contentColor = Color(0xFF002817)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = !isLoadingCart
-                    ) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isLoadingCart) "Сборка корзины..." else "Заказать в ${selectedStore.title}",
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
@@ -219,7 +285,7 @@ fun MenuScreen(
                                 Icon(Icons.Default.Restaurant, contentDescription = null, tint = SentinelCyan)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Нажмите на любое блюдо, чтобы открыть пошаговый рецепт, КБЖУ и запустить кухонный таймер готовки.",
+                                    text = "Нажмите на любое блюдо, чтобы открыть рецепт, фото и КБЖУ. Ингредиенты подобраны с учетом стоп-листа.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SentinelTextSecondary
                                 )
@@ -240,54 +306,127 @@ fun MenuScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
+                        // Выбор активного магазина доставки
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DeliveryStore.values().forEach { store ->
+                                val isSelected = selectedStore == store
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedStore = store },
+                                    label = { Text(store.title) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = SentinelEmerald,
+                                        selectedLabelColor = Color(0xFF002817),
+                                        containerColor = SentinelBgCard,
+                                        labelColor = SentinelTextSecondary
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // КНОПКА СКОПИРОВАТЬ СПИСОК В БУФЕР ОБМЕНА
+                    item {
+                        OutlinedButton(
+                            onClick = {
+                                StoreDeliveryManager.copyShoppingListToClipboard(context, shoppingList, totalEstimatedCost)
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelCyan),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Скопировать полный список для доставки")
+                        }
+                    }
+
+                    item {
                         Text(
-                            text = "Суммарный список продуктов для приготовления всех блюд меню без ингредиентов из стоп-листа.",
+                            text = "Нажмите «В ${selectedStore.title}» у любого товара, чтобы сразу открыть его в приложении магазина и добавить в корзину:",
                             style = MaterialTheme.typography.bodySmall,
                             color = SentinelTextSecondary
                         )
                     }
 
+                    // СПИСОК ТОВАРОВ КОРЗИНЫ
                     items(shoppingList) { item ->
+                        val isChecked = collectedItems[item.name] == true
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = SentinelBgCard),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isChecked) SentinelBgSecondary.copy(alpha = 0.6f) else SentinelBgCard
+                            ),
                             shape = RoundedCornerShape(12.dp),
                             border = CardDefaults.outlinedCardBorder().copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(SentinelBorderSubtle)
+                                brush = androidx.compose.ui.graphics.SolidColor(
+                                    if (isChecked) SentinelBorderSubtle else SentinelBorderSubtle
+                                )
                             )
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { collectedItems[item.name] = it },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = SentinelEmerald,
+                                        checkmarkColor = Color(0xFF002817),
+                                        uncheckedColor = SentinelTextSecondary
+                                    )
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp)
+                                ) {
+                                    val qty = if (item.totalQuantity % 1.0 == 0.0) item.totalQuantity.toInt().toString() else "%.1f".format(item.totalQuantity)
                                     Text(
                                         text = item.name,
-                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                        color = SentinelTextPrimary
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Medium,
+                                            textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
+                                        ),
+                                        color = if (isChecked) SentinelTextSecondary else SentinelTextPrimary
                                     )
                                     Text(
-                                        text = "Объем: ${item.totalQuantity.toInt()} ${item.unit}",
+                                        text = "$qty ${item.unit} • ~${item.estimatedTotalCost.toInt()} ₽",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = SentinelTextSecondary
+                                        color = if (isChecked) SentinelTextSecondary else SentinelCyan
                                     )
                                 }
-                                Text(
-                                    text = "~${item.estimatedTotalCost.toInt()} ₽",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = SentinelEmerald
-                                )
+
+                                // Кнопка быстрого перехода в магазин на страницу товара
+                                IconButton(
+                                    onClick = {
+                                        StoreDeliveryManager.openProductSearch(context, selectedStore, item.name)
+                                        collectedItems[item.name] = true
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = SentinelEmerald.copy(alpha = 0.15f),
+                                        contentColor = SentinelEmerald
+                                    )
+                                ) {
+                                    Icon(Icons.Default.AddShoppingCart, contentDescription = "В магазин", modifier = Modifier.size(20.dp))
+                                }
                             }
                         }
                     }
-                    item { Spacer(modifier = Modifier.height(100.dp)) }
+                    item { Spacer(modifier = Modifier.height(110.dp)) }
                 }
             }
         }
@@ -347,13 +486,34 @@ fun MealRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .clickable { onClick(recipe) }
             .background(SentinelBgPrimary.copy(alpha = 0.5f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Мини-превью картинка блюда
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SentinelBgSecondary)
+        ) {
+            if (recipe.imageUrl.isNotBlank()) {
+                AsyncImage(
+                    model = recipe.imageUrl,
+                    contentDescription = recipe.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Restaurant, contentDescription = null, tint = SentinelCyan, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label.uppercase(),
@@ -363,7 +523,8 @@ fun MealRow(
             Text(
                 text = recipe.title,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = SentinelTextPrimary
+                color = SentinelTextPrimary,
+                maxLines = 1
             )
         }
         Column(horizontalAlignment = Alignment.End) {

@@ -10,16 +10,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.smartbudget.app.domain.menu.MealType
 import com.smartbudget.app.domain.menu.MenuRecipeEngine
 import com.smartbudget.app.domain.menu.Recipe
@@ -164,7 +165,7 @@ fun RecipesLibraryScreen(
                 }
             }
 
-            // СПИСОК РЕЦЕПТОВ
+            // СПИСОК РЕЦЕПТОВ С ФОТОГРАФИЯМИ
             items(filteredRecipes) { recipe ->
                 RecipeCatalogCard(
                     recipe = recipe,
@@ -193,55 +194,67 @@ fun RecipeCatalogCard(
             brush = androidx.compose.ui.graphics.SolidColor(SentinelBorderSubtle)
         )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            // КАРТИНКА БЛЮДА В КАРТОЧКЕ
+            Box(
+                modifier = Modifier
+                    .size(90.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SentinelBgSecondary)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = recipe.mealType.title.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SentinelCyan
+                if (recipe.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = recipe.imageUrl,
+                        contentDescription = recipe.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = recipe.title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = SentinelTextPrimary
-                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Restaurant, contentDescription = null, tint = SentinelCyan.copy(alpha = 0.5f))
+                    }
                 }
             }
 
-            // ИНГРЕДИЕНТЫ КРАТКО
-            Text(
-                text = recipe.ingredients.joinToString(", ") { it.name },
-                style = MaterialTheme.typography.bodySmall,
-                color = SentinelTextSecondary,
-                maxLines = 2
-            )
-
-            HorizontalDivider(color = SentinelBorderSubtle)
-
-            // ПЛАШКИ МЕТРИК
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = recipe.mealType.title.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = SentinelCyan
+                )
+                Text(
+                    text = recipe.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = SentinelTextPrimary,
+                    maxLines = 2
+                )
+
+                // ПЛАШКИ МЕТРИК
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.LocalFireDepartment,
                             contentDescription = null,
                             tint = SentinelAmber,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "${recipe.calories} ккал",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
@@ -254,9 +267,9 @@ fun RecipeCatalogCard(
                             Icons.Default.AccessTime,
                             contentDescription = null,
                             tint = SentinelCyan,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "${recipe.cookingTimeMinutes} мин",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
@@ -264,12 +277,6 @@ fun RecipeCatalogCard(
                         )
                     }
                 }
-
-                Text(
-                    text = "Б ${recipe.proteinGrams} / Ж ${recipe.fatsGrams} / У ${recipe.carbsGrams}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = SentinelTextSecondary
-                )
             }
         }
     }

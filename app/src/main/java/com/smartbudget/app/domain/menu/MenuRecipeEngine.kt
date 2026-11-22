@@ -28,7 +28,8 @@ data class Recipe(
     val fatsGrams: Int,
     val carbsGrams: Int,
     val ingredients: List<Ingredient>,
-    val instruction: String
+    val instruction: String,
+    val imageUrl: String = ""
 )
 
 data class DailyMealPlan(
@@ -58,12 +59,13 @@ object MenuRecipeEngine {
             cookingTimeMinutes = 15,
             calories = 380, proteinGrams = 32, fatsGrams = 12, carbsGrams = 35,
             ingredients = listOf(
-                Ingredient("Творог 5% ВкусВилл", 200.0, "г", "vv_tvorog_5", 135.0),
+                Ingredient("Творог 5% ВкусВилл", 200.0, "г", "185", 135.0),
                 Ingredient("Яйцо куриное С0", 1.0, "шт", "vv_egg_c0", 15.0),
                 Ingredient("Мука рисовая", 30.0, "г", "vv_rice_flour", 20.0),
                 Ingredient("Черника быстрозамороженная", 50.0, "г", "vv_berries", 65.0)
             ),
-            instruction = "Смешать творог, яйцо и рисовую муку. Сформировать сырники и обжарить на антипригарной сковороде по 4 мин с каждой стороны."
+            instruction = "Смешать творог, яйцо и рисовую муку до однородности. Сформировать сырники и обжарить на сковороде по 4 минуты с каждой стороны до золотистой корочки. Подавать с ягодами черники.",
+            imageUrl = "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "b2",
@@ -77,11 +79,12 @@ object MenuRecipeEngine {
                 Ingredient("Томаты черри", 60.0, "г", "vv_cherry", 60.0),
                 Ingredient("Сыр сулугуни", 30.0, "г", "vv_suluguni", 45.0)
             ),
-            instruction = "Взбить яйца, вылить на сковороду с припущенным шпинатом и черри, посыпать сыром."
+            instruction = "Взбить яйца венчиком. На сковороде слегка припустить шпинат и половинки черри, залить яичной смесью, посыпать натертым сулугуни и готовить под крышкой 5 минут.",
+            imageUrl = "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "b3",
-            title = "Овсяноблин с слабосоленой форелью и зеленью",
+            title = "Овсяноблин со слабосоленой форелью и зеленью",
             mealType = MealType.BREAKFAST,
             cookingTimeMinutes = 12,
             calories = 390, proteinGrams = 28, fatsGrams = 16, carbsGrams = 34,
@@ -92,7 +95,8 @@ object MenuRecipeEngine {
                 Ingredient("Форель слабосоленая", 50.0, "г", "vv_trout", 180.0),
                 Ingredient("Творожный сыр", 25.0, "г", "vv_cream_cheese", 35.0)
             ),
-            instruction = "Перемолоть овсянку с яйцом и молоком, испечь блин, завернуть внутрь сыр и форель."
+            instruction = "Измельчить овсяные хлопья, смешать с яйцом и молоком. Испечь овсяноблин на антипригарной сковороде. Смазать творожным сыром, выложить кусочки форели и сложить пополам.",
+            imageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "b4",
@@ -105,7 +109,8 @@ object MenuRecipeEngine {
                 Ingredient("Яйцо куриное С0", 1.0, "шт", "vv_egg_c0", 15.0),
                 Ingredient("Авокадо Хасс", 0.5, "шт", "vv_avocado", 90.0)
             ),
-            instruction = "Отварить гречку, сверху выложить теплое яйцо пашот и ломтики спелого авокадо."
+            instruction = "Сварить рассыпчатую гречневую кашу. Сварить яйцо пашот в подсоленной воде с каплей уксуса 3 минуты. Выложить гречку, яйцо пашот и ломтики свежего авокадо.",
+            imageUrl = "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "b5",
@@ -118,13 +123,14 @@ object MenuRecipeEngine {
                 Ingredient("Томаты в собственном соку", 120.0, "г", "vv_tomatoes_canned", 50.0),
                 Ingredient("Перец болгарский сладкий", 70.0, "г", "vv_bell_pepper", 45.0)
             ),
-            instruction = "Обжарить перец в томатах, сделать углубления, выпустить яйца и довести под крышкой."
+            instruction = "Обжарить кубики сладкого перца, добавить томаты в собственном соку и специи. Сделать лунки, разбить яйца, накрыть крышкой и готовить до схватывания белка.",
+            imageUrl = "https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&auto=format&fit=crop&q=80"
         ),
 
         // ОБЕДЫ
         Recipe(
             id = "l1",
-            title = "Паста твердых сортов с фаршем индейки в томатном соусе",
+            title = "Паста из твердых сортов с фаршем индейки",
             mealType = MealType.LUNCH,
             cookingTimeMinutes = 25,
             calories = 540, proteinGrams = 42, fatsGrams = 14, carbsGrams = 62,
@@ -134,7 +140,8 @@ object MenuRecipeEngine {
                 Ingredient("Томатный соус базилик", 80.0, "г", "vv_tomato_sauce", 40.0),
                 Ingredient("Сыр пармезан тертый", 20.0, "г", "vv_parmesan", 55.0)
             ),
-            instruction = "Обжарить фарш индейки, залить томатным соусом, соединить с пастой аль денте."
+            instruction = "Обжарить фарш из индейки без лишнего масла, добавить густой томатный соус. Отварить спагетти аль денте, перемешать с соусом и посыпать сыром.",
+            imageUrl = "https://images.unsplash.com/photo-1621996346565-e3d5d6281220?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "l2",
@@ -148,7 +155,8 @@ object MenuRecipeEngine {
                 Ingredient("Морковь свежая", 60.0, "г", "vv_carrot", 12.0),
                 Ingredient("Масло сливочное 82.5%", 10.0, "г", "vv_butter", 18.0)
             ),
-            instruction = "Потушить кусочки говядины с морковью, засыпать сухую гречку, залить кипятком и томить 20 мин."
+            instruction = "Нарезать говядину кубиками, тушить с морковью 20 минут. Всыпать промытую гречневую крупу, залить кипятком 1:2 и томить под крышкой до готовности.",
+            imageUrl = "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "l3",
@@ -161,7 +169,8 @@ object MenuRecipeEngine {
                 Ingredient("Картофель молодой", 200.0, "г", "vv_potato", 25.0),
                 Ingredient("Масло оливковое", 10.0, "мл", "vv_olive_oil", 20.0)
             ),
-            instruction = "Нарезать картофель дольками, курицу порционными кусками, запечь в духовке при 190°C 30 минут."
+            instruction = "Картофель нарезать дольками, куриное филе замариновать в травах с капелькой оливкового масла. Запекать в духовке при 190°C 30 минут до аппетитной корочки.",
+            imageUrl = "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "l4",
@@ -174,7 +183,8 @@ object MenuRecipeEngine {
                 Ingredient("Морковь свежая", 50.0, "г", "vv_carrot", 10.0),
                 Ingredient("Сухарики цельнозерновые", 30.0, "г", "vv_croutons", 25.0)
             ),
-            instruction = "Сварить чечевицу с морковью до мягкости, пробить погружным блендером, подавать с сухариками."
+            instruction = "Чечевицу с морковью отварить в подсоленной воде 15 минут. Пробить погружным блендером до бархатистой кремовой текстуры. Подавать с хрустящими сухариками.",
+            imageUrl = "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "l5",
@@ -187,13 +197,14 @@ object MenuRecipeEngine {
                 Ingredient("Крупа булгур", 80.0, "г", "vv_bulgur", 30.0),
                 Ingredient("Морковь свежая", 50.0, "г", "vv_carrot", 10.0)
             ),
-            instruction = "Обжарить кусочки индейки с морковью, добавить булгур, залить водой 1:2 и варить 18 минут."
+            instruction = "Обжарить сочные кусочки индейки с морковью. Засыпать булгур, прогреть пару минут с мясом, влить горячую воду и тушить 18 минут на медленном огне.",
+            imageUrl = "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?w=800&auto=format&fit=crop&q=80"
         ),
 
         // УЖИНЫ
         Recipe(
             id = "d1",
-            title = "Филе трески на пару с брокколи и зеленой фасолью",
+            title = "Филе трески на пару с брокколи и стручковой фасолью",
             mealType = MealType.DINNER,
             cookingTimeMinutes = 20,
             calories = 360, proteinGrams = 42, fatsGrams = 6, carbsGrams = 22,
@@ -202,11 +213,12 @@ object MenuRecipeEngine {
                 Ingredient("Капуста брокколи зам.", 120.0, "г", "vv_broccoli", 65.0),
                 Ingredient("Фасоль стручковая зам.", 100.0, "г", "vv_green_beans", 50.0)
             ),
-            instruction = "Приготовить рыбу и овощи на пару или в сотейнике с капелькой воды 15 минут, сбрызнуть лимоном."
+            instruction = "Филе нежной белой рыбы и соцветия брокколи с фасолью выложить в пароварку или сотейник. Готовить 15 минут, сбрызнуть соком лимона.",
+            imageUrl = "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "d2",
-            title = "Теплый салат с обжаренной куриной грудкой и черри",
+            title = "Теплый салат с куриной грудкой и томатами черри",
             mealType = MealType.DINNER,
             cookingTimeMinutes = 15,
             calories = 380, proteinGrams = 41, fatsGrams = 14, carbsGrams = 15,
@@ -216,7 +228,8 @@ object MenuRecipeEngine {
                 Ingredient("Томаты черри", 80.0, "г", "vv_cherry", 70.0),
                 Ingredient("Масло оливковое", 10.0, "мл", "vv_olive_oil", 20.0)
             ),
-            instruction = "Быстро обжарить ломтики курицы, выложить на подушку из салатного микса и черри, заправить маслом."
+            instruction = "Куриную грудку быстро подрумянить на сковороде-гриль. Выложить на сочные листья салата и сладкие черри, заправить оливковым маслом.",
+            imageUrl = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "d3",
@@ -229,20 +242,22 @@ object MenuRecipeEngine {
                 Ingredient("Кабачки свежие", 180.0, "г", "vv_zucchini", 45.0),
                 Ingredient("Яйцо куриное С0", 1.0, "шт", "vv_egg_c0", 15.0)
             ),
-            instruction = "Сформировать котлетки из фарша и яйца, выложить в сотейник с нарезанными кабачками, тушить 20 мин."
+            instruction = "Из фарша индейки и яйца слепить нежные котлетки. Выложить в сотейник с кружочками кабачков, подлить немного воды и тушить 20 минут.",
+            imageUrl = "https://images.unsplash.com/photo-1529042410759-befb1204b468?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "d4",
-            title = "Творожная запеканка с ягодами (легкий ужин)",
+            title = "Творожная запеканка с лесными ягодами",
             mealType = MealType.DINNER,
             cookingTimeMinutes = 30,
             calories = 350, proteinGrams = 36, fatsGrams = 10, carbsGrams = 24,
             ingredients = listOf(
-                Ingredient("Творог 5% ВкусВилл", 200.0, "г", "vv_tvorog_5", 135.0),
+                Ingredient("Творог 5% ВкусВилл", 200.0, "г", "185", 135.0),
                 Ingredient("Яйцо куриное С0", 1.0, "шт", "vv_egg_c0", 15.0),
                 Ingredient("Ягоды черники замороженные", 50.0, "г", "vv_berries", 65.0)
             ),
-            instruction = "Взбить творог с яйцом, выложить в формочку с ягодами, запечь при 180°C 25 минут."
+            instruction = "Творог соединить с яйцом, перемешать до воздушности. Переложить в керамическую форму, вмешать лесные ягоды и выпекать при 180°C 25 минут.",
+            imageUrl = "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
         ),
 
         // ПЕРЕКУСЫ
@@ -257,7 +272,8 @@ object MenuRecipeEngine {
                 Ingredient("Банан свежий", 1.0, "шт", "vv_banana", 25.0),
                 Ingredient("Миндаль сырой", 15.0, "г", "vv_almonds", 40.0)
             ),
-            instruction = "Нарезать банан кружочками в йогурт, посыпать дробленым миндалем."
+            instruction = "Нарезать спелый банан в чашу с густым греческим йогуртом, посыпать дробленым миндалем.",
+            imageUrl = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&auto=format&fit=crop&q=80"
         ),
         Recipe(
             id = "s2",
@@ -269,7 +285,8 @@ object MenuRecipeEngine {
                 Ingredient("Яблоко сезонное сладкое", 1.0, "шт", "vv_apple", 30.0),
                 Ingredient("Орех грецкий очищенный", 20.0, "г", "vv_walnuts", 45.0)
             ),
-            instruction = "Помыть яблоко, съесть вместе с орехами для стабильной энергии."
+            instruction = "Свежее сочное яблоко нарезать дольками и подавать с отборными половинками грецкого ореха.",
+            imageUrl = "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=800&auto=format&fit=crop&q=80"
         )
     )
 
