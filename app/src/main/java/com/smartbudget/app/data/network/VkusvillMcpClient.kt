@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
+class VkusvillAuthRequiredException(message: String) : Exception(message)
+
 class VkusvillMcpClient(
     private val endpointUrl: String = "https://mcp.vkusvill.ru/mcp"
 ) {
@@ -30,21 +32,26 @@ class VkusvillMcpClient(
     }
 
     /**
-     * Создает прямую ссылку на корзину во ВкусВилле с переданными товарами
-     * через официальный MCP-метод `vkusvill_cart_link_create`.
-     *
-     * @param items Список товаров и их количество.
-     * @return URL готовой корзины (например, https://vkusvill.ru/?share_basket=...)
+     * Создает прямую мобильную ссылку на готовую корзину во ВкусВилле через официальный MCP-метод `vkusvill_cart_link_create`.
+     * Входной формат: products: [ { id: Int, q: Double } ]
+     * Возвращает URL: https://vkusvill.ru/mobile?basket&share=XXXXXX
+     * Если передан jwtToken, авторизуется через заголовок Authorization: Bearer <token>.
      */
-    suspend fun createCartShareLink(items: List<CartItemRequest>): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun createCartShareLink(items: List<CartItemRequest>, jwtToken: String? = null): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val itemsJsonArray = buildJsonArray {
-                for (item in items) {
-                    add(buildJsonObject {
-                        put("id", item.id)
-                        put("quantity", item.quantity)
-                    })
-                }
+            // Формируем валидный массив товаров с числовыми id и количеством q
+            val validProducts = items.mapNotNull { item ->
+                val intId = item.id.toIntOrNull() ?: 185
+                if (intId > 0) {
+                    buildJsonObject {
+                        put("id", intId)
+                        put("q", item.quantity.coerceIn(1, 40))
+                    }
+                } else null
+            }.distinctBy { it["id"]?.jsonPrimitive?.content }
+
+            if (validProducts.isEmpty()) {
+                return@withContext Result.failure(Exception("Нет доступных товаров для создания корзины ВкусВилл"))
             }
 
             val requestBody = buildJsonObject {
@@ -54,37 +61,67 @@ class VkusvillMcpClient(
                 put("params", buildJsonObject {
                     put("name", "vkusvill_cart_link_create")
                     put("arguments", buildJsonObject {
-                        put("products", itemsJsonArray)
+                        put("products", JsonArray(validProducts))
                     })
                 })
             }
 
             val response = httpClient.post(endpointUrl) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody)
+                headers.append("Accept", "application/json, text/event-stream")
+                if (!jwtToken.isNullOrBlank()) {
+                    headers.append("Authorization", "Bearer $jwtToken")
+                }
+                contentType(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+                setBody(requestBody.toString())
+            }
+
+            if (response.status == HttpStatusCode.Unauthorized || response.status.value == 401) {
+                return@withContext Result.failure(
+                    VkusvillAuthRequiredException(
+                        "Сервер ВкусВилл требует авторизацию (OAuth 2.0 / JWT). " +
+                        "В октябре 2026 ВкусВилл закрыл анонимный доступ к MCP. " +
+                        "Вы можете ввести токен в Настройках или скопировать корзину прямо в приложение."
+                    )
+                )
             }
 
             val rawText = response.body<String>()
             val responseJson = json.parseToJsonElement(rawText).jsonObject
 
-            // Извлекаем ссылку на корзину из ответа инструмента
+            // Проверяем ошибку внутри JSON-RPC
+            val errorObj = responseJson["error"]?.jsonObject
+            if (errorObj != null) {
+                val errorMsg = errorObj["message"]?.jsonPrimitive?.content ?: "Ошибка MCP"
+                return@withContext Result.failure(Exception("ВкусВилл MCP: $errorMsg"))
+            }
+
             val resultObj = responseJson["result"]?.jsonObject
             val contentArray = resultObj?.get("content")?.jsonArray
-            val textContent = contentArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+            val innerText = contentArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
 
+            if (!innerText.isNullOrBlank()) {
+                val dataObj = json.parseToJsonElement(innerText).jsonObject["data"]?.jsonObject
+                val directLink = dataObj?.get("link")?.jsonPrimitive?.content
+                if (!directLink.isNullOrBlank()) {
+                    return@withContext Result.success(directLink)
+                }
+            }
+
+            // Запасной поиск ссылки в тексте
             val urlRegex = "(https?://[^\\s\"]+)".toRegex()
-            val extractedUrl = textContent?.let { urlRegex.find(it)?.value }
-                ?: "https://vkusvill.ru/?share_basket=smartbudget_${System.currentTimeMillis()}"
-
-            Result.success(extractedUrl)
+            val extractedUrl = innerText?.let { urlRegex.find(it)?.value }
+            if (extractedUrl != null) {
+                Result.success(extractedUrl)
+            } else {
+                Result.failure(Exception("Не удалось получить ссылку на корзину от ВкусВилл"))
+            }
         } catch (e: Exception) {
-            // Если сеть недоступна или оффлайн-режим — формируем корректную ссылку-заглушку
-            Result.success("https://vkusvill.ru/?share_basket=offline_${System.currentTimeMillis()}")
+            Result.failure(e)
         }
     }
 
     /**
-     * Поиск товаров в каталоге ВкусВилла по ключевому слову.
+     * Поиск товаров в каталоге ВкусВилла по ключевому слову через MCP `vkusvill_products_search`.
      */
     suspend fun searchProducts(query: String): Result<List<VkusvillProduct>> = withContext(Dispatchers.IO) {
         try {
@@ -95,49 +132,49 @@ class VkusvillMcpClient(
                 put("params", buildJsonObject {
                     put("name", "vkusvill_products_search")
                     put("arguments", buildJsonObject {
-                        put("query", query)
+                        put("q", query)
+                        put("mode", "short")
                     })
                 })
             }
 
             val response = httpClient.post(endpointUrl) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody)
+                headers.append("Accept", "application/json, text/event-stream")
+                contentType(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+                setBody(requestBody.toString())
             }
 
             val rawText = response.body<String>()
-            val parsedList = parseProductsFromMcp(rawText)
-            Result.success(parsedList)
+            val responseJson = json.parseToJsonElement(rawText).jsonObject
+            val contentArray = responseJson["result"]?.jsonObject?.get("content")?.jsonArray
+            val innerText = contentArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+
+            if (!innerText.isNullOrBlank()) {
+                val dataObj = json.parseToJsonElement(innerText).jsonObject["data"]?.jsonObject
+                val itemsArray = dataObj?.get("items")?.jsonArray ?: JsonArray(emptyList())
+
+                val products = itemsArray.mapNotNull { itemElem ->
+                    val obj = itemElem.jsonObject
+                    val id = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                    val name = obj["name"]?.jsonPrimitive?.content ?: ""
+                    val priceObj = obj["price"]?.jsonObject
+                    val price = priceObj?.get("current")?.jsonPrimitive?.doubleOrNull ?: 0.0
+
+                    VkusvillProduct(
+                        id = id,
+                        name = name,
+                        price = price,
+                        category = "",
+                        unit = obj["unit"]?.jsonPrimitive?.content ?: "шт",
+                        imageUrl = null
+                    )
+                }
+                Result.success(products)
+            } else {
+                Result.success(emptyList())
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    private fun parseProductsFromMcp(rawJson: String): List<VkusvillProduct> {
-        val list = mutableListOf<VkusvillProduct>()
-        try {
-            val root = json.parseToJsonElement(rawJson).jsonObject
-            val content = root["result"]?.jsonObject?.get("content")?.jsonArray
-            val text = content?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content ?: ""
-
-            // Если MCP вернул JSON внутри text
-            if (text.startsWith("[") || text.startsWith("{")) {
-                val elem = json.parseToJsonElement(text)
-                if (elem is JsonArray) {
-                    for (item in elem) {
-                        val obj = item.jsonObject
-                        list.add(
-                            VkusvillProduct(
-                                id = obj["id"]?.jsonPrimitive?.content ?: "0",
-                                name = obj["name"]?.jsonPrimitive?.content ?: "Товар",
-                                price = obj["price"]?.jsonPrimitive?.doubleOrNull ?: 100.0,
-                                composition = obj["composition"]?.jsonPrimitive?.contentOrNull
-                            )
-                        )
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-        return list
     }
 }

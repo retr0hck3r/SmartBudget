@@ -1,5 +1,8 @@
 package com.smartbudget.app.ui.screens.menu
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,14 +32,17 @@ import com.smartbudget.app.domain.menu.Recipe
 import com.smartbudget.app.domain.menu.ShoppingItem
 import com.smartbudget.app.domain.stoplist.UserFoodPreferences
 import com.smartbudget.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuScreen(
     userPreferences: UserFoodPreferences,
+    onNavigateToSettings: () -> Unit = {},
     onCreateCartLink: suspend (List<CartItemRequest>) -> Result<String>
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val mealPlan = remember(userPreferences) {
         MenuRecipeEngine.generatePlan(15, userPreferences)
@@ -53,6 +59,7 @@ fun MenuScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0: Меню рецептов, 1: Корзина
     var selectedRecipeForDetail by remember { mutableStateOf<Recipe?>(null) }
     var selectedStore by remember { mutableStateOf(DeliveryStore.VKUSVILL) }
+    var isLoadingVkusvillCart by remember { mutableStateOf(false) }
 
     // Состояние собранных пользователем товаров
     val collectedItems = remember { mutableStateMapOf<String, Boolean>() }
@@ -60,6 +67,10 @@ fun MenuScreen(
     // Пошаговый ассистент сборщика корзины
     var isAssistantOpen by remember { mutableStateOf(false) }
     var assistantIndex by remember { mutableStateOf(0) }
+
+    // Диалог ошибки авторизации ВкусВилл MCP
+    var showVkusvillAuthDialog by remember { mutableStateOf(false) }
+    var vkusvillAuthErrorMessage by remember { mutableStateOf("") }
 
     selectedRecipeForDetail?.let { recipe ->
         RecipeDetailDialog(
@@ -183,6 +194,78 @@ fun MenuScreen(
         )
     }
 
+    // ДИАЛОГ АВТОРИЗАЦИИ ВКУСВИЛЛ MCP С УДОБНЫМИ АЛЬТЕРНАТИВАМИ
+    if (showVkusvillAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showVkusvillAuthDialog = false },
+            title = {
+                Text(
+                    text = "Авторизация ВкусВилл MCP",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = SentinelEmerald)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "В октябре 2026 ВкусВилл закрыл анонимный доступ к своему MCP и ввел обязательную OAuth 2.0 авторизацию (JWT) для защиты личных кабинетов.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SentinelTextPrimary
+                    )
+                    Text(
+                        text = "Вы можете скопировать все ${shoppingList.size} товаров и сразу открыть приложение ВкусВилл, пройти пошаговый подбор или ввести токен в Настройках.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SentinelTextSecondary
+                    )
+
+                    Button(
+                        onClick = {
+                            showVkusvillAuthDialog = false
+                            StoreDeliveryManager.openStoreWithFullList(context, DeliveryStore.VKUSVILL, shoppingList, totalEstimatedCost)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SentinelEmerald, contentColor = Color(0xFF002817)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Скопировать и открыть ВкусВилл", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showVkusvillAuthDialog = false
+                            assistantIndex = 0
+                            isAssistantOpen = true
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelCyan),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Пошаговый ассистент заказа")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showVkusvillAuthDialog = false
+                        onNavigateToSettings()
+                    }
+                ) {
+                    Text("Настройки токена", color = SentinelCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVkusvillAuthDialog = false }) {
+                    Text("Закрыть", color = SentinelTextSecondary)
+                }
+            },
+            containerColor = SentinelBgCard
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -227,17 +310,70 @@ fun MenuScreen(
                                 )
                             }
 
-                            Button(
+                            // Кнопка быстрого пошагового сборщика
+                            OutlinedButton(
                                 onClick = {
                                     assistantIndex = 0
                                     isAssistantOpen = true
                                 },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelCyan),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Bolt, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Пошагово")
+                            }
+                        }
+
+                        // Если выбран ВкусВилл — официальный MCP заказ в 1 клик с интеллектуальным фоллбэком!
+                        if (selectedStore == DeliveryStore.VKUSVILL) {
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    coroutineScope.launch {
+                                        isLoadingVkusvillCart = true
+                                        val cartItems = shoppingList.map {
+                                            CartItemRequest(it.vkusvillProductId ?: "185", 1)
+                                        }
+                                        val result = onCreateCartLink(cartItems)
+                                        isLoadingVkusvillCart = false
+                                        result.onSuccess { url ->
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(intent)
+                                        }.onFailure { err ->
+                                            vkusvillAuthErrorMessage = err.message ?: "Требуется авторизация ВкусВилл"
+                                            showVkusvillAuthDialog = true
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SentinelEmerald, contentColor = Color(0xFF002817)),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !isLoadingVkusvillCart
+                            ) {
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isLoadingVkusvillCart) "Сборка корзины через MCP..." else "Заказать всю корзину во ВкусВилл",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    StoreDeliveryManager.openStoreWithFullList(context, selectedStore, shoppingList, totalEstimatedCost)
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = SentinelEmerald, contentColor = Color(0xFF002817)),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Default.Bolt, contentDescription = null)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Пошаговый сборщик", fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Скопировать и открыть ${selectedStore.title}",
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -351,7 +487,11 @@ fun MenuScreen(
 
                     item {
                         Text(
-                            text = "Нажмите «В ${selectedStore.title}» у любого товара, чтобы сразу открыть его в приложении магазина и добавить в корзину:",
+                            text = if (selectedStore == DeliveryStore.VKUSVILL) {
+                                "Для ВкусВилла доступна автоматическая сборка корзины в 1 клик кнопкой внизу, либо поштучный выбор:"
+                            } else {
+                                "Нажмите «В ${selectedStore.title}» у любого товара, чтобы сразу открыть его в приложении магазина и добавить в корзину:"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = SentinelTextSecondary
                         )

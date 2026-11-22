@@ -316,6 +316,107 @@ fun SettingsScreen(
                 }
             }
 
+            // 3.5. АВТОРИЗАЦИЯ ВКУСВИЛЛ MCP API (OAuth 2.0 / JWT)
+            item {
+                HorizontalDivider(color = SentinelBorderSubtle)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ВкусВилл MCP API (OAuth 2.0)",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = SentinelEmerald
+                    )
+                    val hasToken = !settingsState.vkusvillJwtToken.isNullOrBlank()
+                    Badge(
+                        containerColor = if (hasToken) SentinelEmerald.copy(alpha = 0.2f) else SentinelTextSecondary.copy(alpha = 0.2f),
+                        contentColor = if (hasToken) SentinelEmerald else SentinelTextSecondary
+                    ) {
+                        Text(if (hasToken) "ПОДКЛЮЧЕНО" else "БЕЗ ТОКЕНА", modifier = Modifier.padding(4.dp))
+                    }
+                }
+                Text(
+                    text = "С октября 2026 ВкусВилл требует JWT токен для MCP сборки корзин. Вставьте токен вашего OAuth клиента, чтобы корзина генерировалась в 1 клик, либо используйте прямое открытие приложения.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SentinelTextSecondary,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                )
+
+                var tokenInput by remember(settingsState.vkusvillJwtToken) {
+                    mutableStateOf(settingsState.vkusvillJwtToken ?: "")
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SentinelBgCard),
+                    shape = RoundedCornerShape(14.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(SentinelBorderSubtle)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = tokenInput,
+                            onValueChange = {
+                                tokenInput = it
+                                settingsManager.setVkusvillJwtToken(it)
+                            },
+                            label = { Text("ВкусВилл JWT Bearer Token") },
+                            placeholder = { Text("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = SentinelEmerald,
+                                unfocusedBorderColor = SentinelBorderSubtle,
+                                focusedTextColor = SentinelTextPrimary,
+                                unfocusedTextColor = SentinelTextPrimary,
+                                focusedLabelColor = SentinelEmerald,
+                                unfocusedLabelColor = SentinelTextSecondary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://vkusvill.ru/oauth/registration/")
+                                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                                    context.startActivity(intent)
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelCyan),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Регистрация OAuth", fontSize = 12.sp)
+                            }
+
+                            if (tokenInput.isNotBlank()) {
+                                TextButton(
+                                    onClick = {
+                                        tokenInput = ""
+                                        settingsManager.setVkusvillJwtToken(null)
+                                    }
+                                ) {
+                                    Text("Очистить", color = SentinelRose)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // 4. ВЕРСИЯ ПРИЛОЖЕНИЯ И САМООБНОВЛЕНИЕ С GITHUB
             item {
                 HorizontalDivider(color = SentinelBorderSubtle)
@@ -356,7 +457,7 @@ fun SettingsScreen(
                                 )
                             }
                             Badge(containerColor = SentinelCyan.copy(alpha = 0.2f), contentColor = SentinelCyan) {
-                                Text("Release v1.1.0", modifier = Modifier.padding(4.dp))
+                                Text("Release ${UpdateChecker.CURRENT_VERSION_TAG}", modifier = Modifier.padding(4.dp))
                             }
                         }
 

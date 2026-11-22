@@ -17,7 +17,7 @@ data class GitHubReleaseInfo(
 
 object UpdateChecker {
 
-    const val CURRENT_VERSION_TAG = "v1.1.1"
+    const val CURRENT_VERSION_TAG = "v1.1.2"
     private const val GITHUB_RELEASES_URL = "https://api.github.com/repos/retr0hck3r/SmartBudget/releases/latest"
     private const val GITHUB_TAGS_URL = "https://api.github.com/repos/retr0hck3r/SmartBudget/tags"
 

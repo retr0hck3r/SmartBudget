@@ -24,8 +24,8 @@ enum class DeliveryStore(
     ),
     LENTA(
         title = "Лента Онлайн",
-        packageName = "com.lenta.app",
-        fallbackPackage = null,
+        packageName = "com.icemobile.lenta.prod",
+        fallbackPackage = "com.lenta.app",
         searchUrlPrefix = "https://lenta.com/search/?searchText=",
         appSearchScheme = "lenta://search?searchText="
     ),
@@ -58,18 +58,22 @@ object StoreDeliveryManager {
     }
 
     /**
-     * Открывает карточку поиска конкретного товара в приложении выбранного магазина
-     * или в веб-каталоге, если приложение не установлено.
+     * Надежно открывает приложение магазина на телефоне с копированием поискового запроса в буфер обмена.
+     * Если приложение установлено — открывается ОНО, а не браузер!
      */
     fun openProductSearch(context: Context, store: DeliveryStore, rawProductName: String) {
         val query = cleanSearchQuery(rawProductName)
         val encodedQuery = Uri.encode(query)
         val webSearchUrl = store.searchUrlPrefix + encodedQuery
-        val appSchemeUrl = store.appSearchScheme + encodedQuery
+
+        // 1. Всегда копируем очищенное название товара в буфер обмена для быстрой вставки
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Product Search", query)
+        clipboard.setPrimaryClip(clip)
 
         val pm = context.packageManager
 
-        // 1. Проверяем основное приложение (или фоллбэк пакет для Яндекс.Еды/Лавки)
+        // 2. Определяем установленный пакет
         val targetPkg = if (pm.getLaunchIntentForPackage(store.packageName) != null) {
             store.packageName
         } else if (store.fallbackPackage != null && pm.getLaunchIntentForPackage(store.fallbackPackage) != null) {
@@ -79,43 +83,74 @@ object StoreDeliveryManager {
         }
 
         if (targetPkg != null) {
-            // Пробуем кастомную deep link схему
+            // Пробуем передать веб-ссылку поиска напрямую внутрь установленного приложения
             try {
-                val schemeIntent = Intent(Intent.ACTION_VIEW, Uri.parse(appSchemeUrl)).apply {
+                val inAppSearchIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webSearchUrl)).apply {
                     setPackage(targetPkg)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                context.startActivity(schemeIntent)
+                context.startActivity(inAppSearchIntent)
+                Toast.makeText(context, "«$query» скопировано. Открываем ${store.title}", Toast.LENGTH_SHORT).show()
                 return
             } catch (_: Exception) {
-                // Если кастомная схема не подошла, пробуем открыть https URL в приложении
-                try {
-                    val webInAppIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webSearchUrl)).apply {
-                        setPackage(targetPkg)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(webInAppIntent)
+                // Если приложение не поддерживает переход по веб-урлу поиска напрямую,
+                // запускаем само приложение — название товара уже в буфере!
+                val launchIntent = pm.getLaunchIntentForPackage(targetPkg)?.apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                if (launchIntent != null) {
+                    context.startActivity(launchIntent)
+                    Toast.makeText(context, "«$query» скопировано. Вставьте в поиск ${store.title}", Toast.LENGTH_LONG).show()
                     return
-                } catch (_: Exception) {
-                    // Фолбэк на запуск приложения
-                    val launchIntent = pm.getLaunchIntentForPackage(targetPkg)
-                    if (launchIntent != null) {
-                        context.startActivity(launchIntent)
-                        return
-                    }
                 }
             }
         }
 
-        // 2. Фолбэк: открытие поиска в веб-браузере
+        // 3. Только если приложение вообще не установлено на телефоне — открываем веб-поиск
         try {
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webSearchUrl)).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(browserIntent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Не удалось открыть страницу магазина", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Приложение ${store.title} не найдено, открываем сайт", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "Не удалось открыть поиск магазина", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * Копирует полный структурированный список покупок в буфер обмена телефона
+     * и сразу же открывает выбранное приложение магазина.
+     */
+    fun openStoreWithFullList(context: Context, store: DeliveryStore, items: List<ShoppingItem>, totalCost: Double) {
+        copyShoppingListToClipboard(context, items, totalCost)
+
+        val pm = context.packageManager
+        val targetPkg = if (pm.getLaunchIntentForPackage(store.packageName) != null) {
+            store.packageName
+        } else if (store.fallbackPackage != null && pm.getLaunchIntentForPackage(store.fallbackPackage) != null) {
+            store.fallbackPackage
+        } else {
+            null
+        }
+
+        if (targetPkg != null) {
+            val launchIntent = pm.getLaunchIntentForPackage(targetPkg)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (launchIntent != null) {
+                context.startActivity(launchIntent)
+                return
+            }
+        }
+
+        // Фолбэк на сайт
+        try {
+            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(store.searchUrlPrefix.substringBefore("/search"))).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(browserIntent)
+        } catch (_: Exception) {}
     }
 
     /**

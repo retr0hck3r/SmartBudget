@@ -20,7 +20,8 @@ data class AppSettingsState(
         10 to PayoutDayConfig(10, 50000.0, 20000.0),
         25 to PayoutDayConfig(25, 50000.0, 0.0)
     ),
-    val defaultStore: DeliveryStore = DeliveryStore.VKUSVILL
+    val defaultStore: DeliveryStore = DeliveryStore.VKUSVILL,
+    val vkusvillJwtToken: String? = null
 )
 
 class SettingsManager(context: Context) {
@@ -58,11 +59,20 @@ class SettingsManager(context: Context) {
             DeliveryStore.VKUSVILL
         }
 
+        val vkusvillToken = prefs.getString("vkusvill_jwt_token", null)?.trim()?.ifBlank { null }
+
         return AppSettingsState(
             selectedDays = days,
             configs = configs,
-            defaultStore = store
+            defaultStore = store,
+            vkusvillJwtToken = vkusvillToken
         )
+    }
+
+    fun setVkusvillJwtToken(token: String?) {
+        val cleaned = token?.trim()?.ifBlank { null }
+        prefs.edit().putString("vkusvill_jwt_token", cleaned).apply()
+        _settingsState.value = _settingsState.value.copy(vkusvillJwtToken = cleaned)
     }
 
     fun togglePayoutDay(day: Int) {

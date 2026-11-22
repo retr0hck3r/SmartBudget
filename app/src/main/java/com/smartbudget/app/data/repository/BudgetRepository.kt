@@ -106,7 +106,7 @@ class BudgetRepository(
         dao.deleteStopWord(StopWordEntity(word.trim().lowercase()))
     }
 
-    suspend fun createVkusvillCartLink(items: List<CartItemRequest>): Result<String> {
-        return vkusvillClient.createCartShareLink(items)
+    suspend fun createVkusvillCartLink(items: List<CartItemRequest>, jwtToken: String? = null): Result<String> {
+        return vkusvillClient.createCartShareLink(items, jwtToken)
     }
 }

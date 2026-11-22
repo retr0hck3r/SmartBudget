@@ -159,8 +159,10 @@ class MainActivity : ComponentActivity() {
 
                             Screen.Menu -> MenuScreen(
                                 userPreferences = currentPreferences,
+                                onNavigateToSettings = { currentScreen = Screen.Settings },
                                 onCreateCartLink = { items ->
-                                    repository.createVkusvillCartLink(items)
+                                    val token = settingsManager.settingsState.value.vkusvillJwtToken
+                                    repository.createVkusvillCartLink(items, token)
                                 }
                             )
 
