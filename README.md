@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Language-Kotlin_2.0-38BDF8?style=for-the-badge&logo=kotlin&logoColor=07090E" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack_Compose_M3-131B2E?style=for-the-badge&logo=jetpackcompose&logoColor=00FFAA" alt="Compose" />
   <img src="https://img.shields.io/badge/Theme-Sentinel_Dark_Cyber-0D121D?style=for-the-badge&logo=shieldsdotio&logoColor=00FFAA" alt="Theme" />
-  <img src="https://img.shields.io/badge/Version-v1.1.0-00FFAA?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.1.1-00FFAA?style=for-the-badge" alt="Version" />
 </p>
 
 ---
